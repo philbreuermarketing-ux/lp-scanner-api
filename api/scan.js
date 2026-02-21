@@ -21,7 +21,7 @@ async function fetchPageSpeed(targetUrl, strategy = "mobile") {
     `https://www.googleapis.com/pagespeedonline/v5/runPagespeed` +
     `?url=${encodeURIComponent(targetUrl)}` +
     `&strategy=${strategy}` +
-    `&category=performance&category=seo&category=best-practices&category=accessibility`;
+    `&category=performance&category=seo&category=best-practices&category=accessibility&key=AIzaSyAgUSr_iH7pCADEVGtktcAtY_BHc7vEH4g`;
 
   const data = await httpsGet(apiUrl);
   if (data.error) throw new Error(data.error.message || "PageSpeed API Fehler");
