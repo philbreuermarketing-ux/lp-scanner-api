@@ -1,23 +1,15 @@
-// api/analyze.js — KI-Analyse mit Claude API
-// Bewertet Landing Pages nach dem 5-Schritte Framework (Friction, Motivation, Value, Objections, Incentives)
-// Speziell ausgerichtet auf Wintergarten/Sonnenschutz-Betriebe
+// api/analyze.js — KI-Analyse mit Groq API (kostenlos, kein Kreditkarte nötig)
+// Bewertet Landing Pages nach dem 5-Schritte Framework
+// Speziell für Wintergarten/Sonnenschutz-Betriebe
 
 const https = require("https");
 
-// ── Hilfsfunktion: HTTPS POST ─────────────────────────────
 function httpsPost(hostname, path, headers, body) {
   return new Promise((resolve, reject) => {
     const bodyStr = JSON.stringify(body);
     const req = https.request(
-      {
-        hostname,
-        path,
-        method: "POST",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(bodyStr),
-        },
+      { hostname, path, method: "POST",
+        headers: { ...headers, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(bodyStr) }
       },
       (res) => {
         let data = "";
@@ -34,21 +26,12 @@ function httpsPost(hostname, path, headers, body) {
   });
 }
 
-// ── Seiten-HTML abrufen (für KI-Analyse) ─────────────────
 function fetchHtml(targetUrl) {
   return new Promise((resolve) => {
     const mod = targetUrl.startsWith("https") ? https : require("http");
-    const req = mod.get(
-      targetUrl,
-      {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; LPScanner/1.0)",
-          Accept: "text/html",
-        },
-        timeout: 10000,
-      },
+    const req = mod.get(targetUrl,
+      { headers: { "User-Agent": "Mozilla/5.0 (compatible; LPScanner/1.0)", Accept: "text/html" }, timeout: 10000 },
       (res) => {
-        // Redirects folgen
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           fetchHtml(res.headers.location).then(resolve).catch(() => resolve(""));
           return;
@@ -63,7 +46,6 @@ function fetchHtml(targetUrl) {
   });
 }
 
-// ── HTML bereinigen (nur sichtbarer Text) ────────────────
 function extractText(html) {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -71,192 +53,145 @@ function extractText(html) {
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 4000); // Claude bekommt max. 4000 Zeichen Seitentext
+    .slice(0, 3500);
 }
 
-// ── Claude Analyse-Prompt ─────────────────────────────────
 function buildPrompt(url, pageText, pagespeedData) {
   const perf = pagespeedData?.mobile?.scores?.performance || "–";
   const seo  = pagespeedData?.mobile?.scores?.seo         || "–";
   const lcp  = pagespeedData?.mobile?.vitals?.lcp         || "–";
 
-  return `Du bist ein freundlicher aber ehrlicher Landing Page Experte, spezialisiert auf Wintergarten-, Sommergarten- und Terrassenüberdachungs-Betriebe in Deutschland, die Google Ads schalten.
+  return `Du bist ein freundlicher Landing Page Experte spezialisiert auf Wintergarten- und Terrassenüberdachungs-Betriebe in Deutschland die Google Ads schalten.
 
-Du analysierst Landing Pages anhand eines bewährten 5-Schritte-Frameworks:
-1. Friction & Anxiety eliminieren (Was bremst oder verwirrt Besucher?)
-2. Motivation aufbauen (Fühlt sich der Besucher sofort angesprochen?)
-3. Wert kommunizieren (Ist klar, warum dieser Betrieb besser ist?)
-4. Einwände adressieren (Werden Zweifel aktiv entkräftet?)
-5. Incentives setzen (Gibt es einen Grund, JETZT zu handeln?)
-
-Technische Daten dieser Seite:
+Technische Daten:
 - URL: ${url}
-- Mobile Performance Score: ${perf}/100
-- SEO Score: ${seo}/100
-- Largest Contentful Paint: ${lcp}
+- Mobile Performance: ${perf}/100
+- SEO: ${seo}/100
+- LCP: ${lcp}
 
-Seiteninhalt (extrahierter Text):
+Seiteninhalt:
 """
-${pageText || "Kein Text extrahierbar — bitte anhand der URL einschätzen."}
+${pageText || "Kein Text extrahierbar."}
 """
 
-Erstelle eine Analyse im folgenden JSON-Format. Antworte NUR mit dem JSON-Objekt, ohne Markdown oder Erklärungen davor/danach:
+Analysiere nach diesem 5-Schritte-Framework und antworte NUR mit validem JSON ohne Markdown-Backticks:
 
 {
-  "overallVerdict": "Ein motivierender Einstiegssatz der die wichtigste Chance benennt (max. 2 Sätze)",
-  "adsBudgetWarning": "Konkrete Einschätzung: Wie viel Budget wird durch die aktuelle Seite verschwendet? (1-2 Sätze, freundlich formuliert)",
+  "overallVerdict": "Motivierender Einstiegssatz mit der wichtigsten Chance (max. 2 Sätze)",
+  "adsBudgetWarning": "Wie viel Ads-Budget wird verschwendet? (1-2 Sätze, freundlich)",
   "teaser": [
-    "Kurzer Teaser-Punkt 1 der im öffentlichen Scanner sichtbar ist (nur Problemhint, keine Lösung)",
-    "Kurzer Teaser-Punkt 2",
-    "Kurzer Teaser-Punkt 3"
+    "Problem-Hinweis 1 ohne Lösung",
+    "Problem-Hinweis 2",
+    "Problem-Hinweis 3"
   ],
   "steps": [
     {
-      "step": 1,
-      "title": "Friction & Anxiety",
-      "emoji": "🛑",
-      "score": 6,
-      "scoreLabel": "Gut / Ausbaufähig / Kritisch",
-      "summary": "Kurze freundliche Zusammenfassung (1-2 Sätze)",
+      "step": 1, "title": "Friction & Anxiety", "emoji": "🛑", "score": 6, "scoreLabel": "Ausbaufähig",
+      "summary": "1-2 Sätze freundliche Zusammenfassung",
       "findings": [
-        { "type": "pass", "text": "Was gut funktioniert" },
+        { "type": "pass", "text": "Was gut ist" },
         { "type": "warn", "text": "Was verbesserungswürdig ist" },
         { "type": "fail", "text": "Was Conversions kostet" }
       ],
-      "topAction": "Die eine wichtigste Maßnahme für diesen Bereich (konkret & umsetzbar)"
+      "topAction": "Konkrete sofort umsetzbare Maßnahme"
     },
     {
-      "step": 2,
-      "title": "Motivation & Relevanz",
-      "emoji": "🚀",
-      "score": 5,
-      "scoreLabel": "Gut / Ausbaufähig / Kritisch",
+      "step": 2, "title": "Motivation & Relevanz", "emoji": "🚀", "score": 5, "scoreLabel": "Ausbaufähig",
       "summary": "...",
-      "findings": [],
+      "findings": [{ "type": "fail", "text": "..." }, { "type": "warn", "text": "..." }],
       "topAction": "..."
     },
     {
-      "step": 3,
-      "title": "Wert kommunizieren",
-      "emoji": "💎",
-      "score": 4,
-      "scoreLabel": "...",
+      "step": 3, "title": "Wert kommunizieren", "emoji": "💎", "score": 4, "scoreLabel": "Kritisch",
       "summary": "...",
-      "findings": [],
+      "findings": [{ "type": "fail", "text": "..." }, { "type": "warn", "text": "..." }],
       "topAction": "..."
     },
     {
-      "step": 4,
-      "title": "Einwände entkräften",
-      "emoji": "🤔",
-      "score": 3,
-      "scoreLabel": "...",
+      "step": 4, "title": "Einwände entkräften", "emoji": "🤔", "score": 3, "scoreLabel": "Kritisch",
       "summary": "...",
-      "findings": [],
+      "findings": [{ "type": "fail", "text": "..." }],
       "topAction": "..."
     },
     {
-      "step": 5,
-      "title": "Incentives & Handlungsdruck",
-      "emoji": "🎁",
-      "score": 4,
-      "scoreLabel": "...",
+      "step": 5, "title": "Incentives & Handlungsdruck", "emoji": "🎁", "score": 4, "scoreLabel": "Ausbaufähig",
       "summary": "...",
-      "findings": [],
+      "findings": [{ "type": "fail", "text": "..." }],
       "topAction": "..."
     }
   ],
   "wintergartenSpecific": {
-    "hasRegionMention": true,
+    "hasRegionMention": false,
     "hasPriceTransparency": false,
     "hasProcessExplained": false,
     "hasPermitInfo": false,
     "hasSocialProof": false,
-    "comment": "Branchenspezifischer Kommentar: Was fehlt typischerweise bei Wintergarten-Betrieben und ist hier auch nicht vorhanden? (2-3 Sätze, freundlich)"
+    "comment": "Branchenspezifischer Kommentar (2-3 Sätze freundlich)"
   },
-  "heroHeadlineAssessment": "Konkrete Einschätzung der Haupt-Überschrift. Wenn erkennbar: Was genau müsste sie sagen um Wintergarten-Käufer sofort anzusprechen?",
-  "ctaAssessment": "Wie ist der Call-to-Action formuliert und was wäre besser?",
+  "heroHeadlineAssessment": "Einschätzung der Headline + konkreter Verbesserungsvorschlag",
+  "ctaAssessment": "Einschätzung des CTA + was besser wäre",
   "quickWins": [
-    "Quick Win 1: Sofort umsetzbar, hoher Impact (konkret!)",
+    "Quick Win 1: Konkret & sofort umsetzbar",
     "Quick Win 2",
     "Quick Win 3"
   ]
 }`;
 }
 
-// ── Vercel Handler ────────────────────────────────────────
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
 
-  const targetUrl    = req.query?.url;
-  const pagespeedRaw = req.query?.pagespeed;
+  const targetUrl = req.query?.url;
+  if (!targetUrl) { res.status(400).json({ error: "Parameter 'url' fehlt" }); return; }
 
-  if (!targetUrl) {
-    res.status(400).json({ error: "Parameter 'url' fehlt" });
-    return;
-  }
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) { res.status(500).json({ error: "GROQ_API_KEY nicht gesetzt in Vercel Environment Variables" }); return; }
 
-  // ── API Key aus Umgebungsvariable ─────────────────────
-  // In Vercel: Settings → Environment Variables → ANTHROPIC_API_KEY
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    res.status(500).json({ error: "ANTHROPIC_API_KEY nicht gesetzt" });
-    return;
-  }
-
-  console.log("KI-Analyse für:", targetUrl);
+  console.log("Groq-Analyse für:", targetUrl);
 
   try {
-    // 1. Seiten-HTML holen
     const html     = await fetchHtml(targetUrl);
     const pageText = extractText(html);
 
-    // 2. PageSpeed-Daten (falls mitgeschickt) parsen
     let pagespeedData = null;
-    if (pagespeedRaw) {
-      try { pagespeedData = JSON.parse(decodeURIComponent(pagespeedRaw)); }
-      catch (e) { /* ignorieren */ }
+    if (req.query?.pagespeed) {
+      try { pagespeedData = JSON.parse(decodeURIComponent(req.query.pagespeed)); } catch (e) {}
     }
 
-    // 3. Claude API aufrufen
-    const prompt   = buildPrompt(targetUrl, pageText, pagespeedData);
-    const claudeRes = await httpsPost(
-      "api.anthropic.com",
-      "/v1/messages",
+    const prompt  = buildPrompt(targetUrl, pageText, pagespeedData);
+    const groqRes = await httpsPost(
+      "api.groq.com",
+      "/openai/v1/chat/completions",
+      { Authorization: `Bearer ${apiKey}` },
       {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      {
-        model: "claude-opus-4-6",
+        model: "llama-3.3-70b-versatile",
         max_tokens: 2000,
-        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        messages: [
+          { role: "system", content: "Du bist ein Landing Page Experte. Antworte ausschließlich mit validem JSON, niemals mit Markdown-Backticks oder erklärendem Text." },
+          { role: "user", content: prompt },
+        ],
       }
     );
 
-    if (claudeRes.error) {
-      throw new Error(claudeRes.error.message || "Claude API Fehler");
-    }
+    if (groqRes.error) throw new Error(groqRes.error.message || "Groq API Fehler");
 
-    // 4. JSON aus Antwort extrahieren
-    const rawText = claudeRes.content?.[0]?.text || "";
+    const rawText = groqRes.choices?.[0]?.message?.content || "";
     let analysis;
     try {
-      // Sicherheits-Strip: Markdown-Backticks entfernen falls vorhanden
       const cleaned = rawText.replace(/```json|```/g, "").trim();
       analysis = JSON.parse(cleaned);
     } catch (e) {
-      throw new Error("KI-Antwort konnte nicht geparst werden: " + rawText.slice(0, 200));
+      throw new Error("JSON konnte nicht geparst werden: " + rawText.slice(0, 200));
     }
 
-    res.status(200).json({ success: true, analysis, fetchTime: new Date().toISOString() });
+    res.status(200).json({ success: true, analysis, model: "llama-3.3-70b-versatile", fetchTime: new Date().toISOString() });
 
   } catch (err) {
-    console.error("Analyze error:", err.message);
+    console.error("Fehler:", err.message);
     res.status(500).json({ error: err.message });
   }
 };
