@@ -2,6 +2,10 @@
   "functions": {
     "api/scan.js": {
       "runtime": "nodejs18.x"
+    },
+    "api/analyze.js": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 30
     }
   }
 }
